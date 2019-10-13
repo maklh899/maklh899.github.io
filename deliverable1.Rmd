@@ -1,0 +1,159 @@
+---
+title: "SF City Employee Compensation"
+author: "Makena Haroldson"
+date: "October 11, 2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+### _**INTRO:**_
+
+In high school as well as college, it is primarly expected of us to have goals of working at top-tier, prominent companies, such as Google and Berkshire Hathaway. They are well known to have great benefits ranging from 100% medical and dental coverage to free cooking classes. Instead of these larger companies, I am analyzing the financial benefits of working for the city, specically, San Francisco from 2013-2019.
+
+### _**Data Source Quality:**_
+
+The source of data is fairly organized, however there are some exceptions. Some of the variables contain two different types input such as Department Code and Job Family Code. The data source will also need to be sparsed in order to group similar information with each other. A limitation of the data source is that we do not know if the benefits of the labor unions are also included to get calculation of the columns that show the different financial benefits. This could affect the outcome because the results could be comparing the labor unions instead of the benefits of the actual job.
+
+
+### _**Part 1: Load Data**_
+
+First, we need to import the data. I downloaded and stored my dataset in a folder called "sf-employee-compensation" and placed it in the folder of this R project. We also need to tidyverse to allows to organize the data.
+```{r}
+#install.packages("tidyverse")
+suppressMessages(library("tidyverse"))
+suppressMessages(library("dplyr"))
+suppressMessages(library("tidyr"))
+suppressMessages(library("ggplot2"))
+suppressMessages(library(scales))
+
+Employee_Compensation<- read_csv("sf-employee-compensation/employee-compensation.csv", col_types = cols(Department = col_character()))
+
+View(Employee_Compensation)
+```
+*NOTE: In employee-compensation dataset the column Department is being read as a logical(true or false) column type. We need to overide this as it contains characters.
+
+
+### _**Part 2: Column Variable Information**_
+
+Column Name | Type | Description
+----------- | ---- | -----------
+Year Type | Characters | Type of job year, Fiscal (July-June) or Calendar (January - December).
+Year | Double | An accounting Period of 12 months.
+Organization Group Code | Characters | The ID code of a specific Organization Group. An Organization Group is a group of Departments.
+Organization Group | Characters |  The title of a specific Organization Group. An Organization Group is a group of Departments.
+Department Code | Characters | The ID code of a specific Department. Departments are the primary organizational unit used by the City and County of San Francisco.
+Department | Characters | The title of a specific Department. Departments are the primary organizational unit used by the City and County of San Francisco.
+Union Code | Characters | The ID of a specific Union. Unions represent employees in collective bargaining agreements. A job belongs to one union, although some jobs are unrepresented(usually temporarily).
+Union | Characters | The title of a specific Union. Unions represent employees in collective bargaining agreements. A job belongs to one union, although some jobs are unrepresented(usually temporarily).
+Job Family Code | Characters | Job Family (ID code) combines similar Jobs into meaningful groups.
+Job Family | Characters | Job Family combines similar Jobs into meaningful groups.
+Job Code | Characters | The ID code of a specific job.
+Job | Characters | The title of a specific job.
+Employee Identifier | Double | Each distinct number in the “Employee Identifier” column represents one employee. These identifying numbers are not meaningful but rather are randomly assigned for the purpose of building this dataset. Employee ID has been included here to allow users to reconstruct the original report. 
+Salaries | Double | Normal salaries paid to permanent or temporary City employees.
+Overtime | Double | Amounts paid to City employees working in excess of 40 hours per week.
+Other Salaries | Double | Various irregular payments made to City employees including premium pay, incentive pay, or other one-time payments. 
+Total Salary | Double | The sum of all salaries paid to City employees.
+Retirement | Double | City contributions to employee retirement plans.    
+Health and Dental | Double | City-paid premiums to health and dental insurance plans covering City employees. To protect confidentiality as legally required, pro-rated citywide averages are presented in lieu of employee-specific health and dental benefits. 
+Other Benefits | Double | Mandatory benefits paid on behalf of employees, such as Social Security (FICA and Medicare) contributions, unemployment insurance premiums, and minor discretionary benefits not included in the other categories.
+Total Benefits | Double | The sum of all benefits paid to City employees.
+Total Compensation | Double | The sum of all salaries and benefits paid to City employees.
+
+
+### _**Part 3: Organizing Data**_
+  
+**Step 1: Modyify Data Values**
+  
+The data table, Employee_Compensation, has duplicate inputs and inconsistent values so we want to change this. We also want to group the values of columns that can be categorized so we can easily execute actions later on.
+```{r}
+#Remove duplicate rows of the dataframe using Employee Identifier and year, to have one per Employee
+Employee_Compensation<- distinct(Employee_Compensation, `Employee Identifier`, Year, `Total Salary`, .keep_all = TRUE)
+
+#Replace the values of "__NOT_APPLICABLE__" to NA
+Employee_Compensation$`Department Code` <- replace(Employee_Compensation$`Department Code`, Employee_Compensation$`Department Code` == "__NOT_APPLICABLE__", NA )
+
+View(Employee_Compensation)
+
+#Grouping the values of Year Type, Organization Group, and Job Family
+Employee_Compensation$`Year Type`<- as.factor(Employee_Compensation$`Year Type`)
+Employee_Compensation$`Organization Group`<- as.factor(Employee_Compensation$`Organization Group`)
+Employee_Compensation$Department<- as.factor(Employee_Compensation$Department)
+Employee_Compensation$`Job Family`<- as.factor(Employee_Compensation$`Job Family`)
+
+levels(Employee_Compensation$`Year Type`)
+levels(Employee_Compensation$`Organization Group`)
+levels(Employee_Compensation$ Department)
+levels(Employee_Compensation$`Job Family`)
+```
+
+
+**Step 2: Dispersing Data Into Tables**
+
+We will now make new tables to organize informationthat is similar to each other. the new tables are:
+ 
+ + Employee_Earnings - An individial's finiacial information 
+ 
+ + Occupation - The factors of a Job, including its Job Family and Union
+ 
+ + Occupation_Association - Shows the heiarchy that a job falls under
+```{r}
+Employee_Earnings <- tibble(`Employee Identifier` = Employee_Compensation$`Employee Identifier`, Year = Employee_Compensation$Year, `Job Code` = Employee_Compensation$`Job Code`, Salaries = Employee_Compensation$Salaries, Overtime = Employee_Compensation$Overtime, `Other Salaries`= Employee_Compensation$`Other Salaries`, Retirement = Employee_Compensation$Retirement, `Health and Dental` = Employee_Compensation$`Health and Dental`, `Other Benefits` = Employee_Compensation$`Other Benefits`, `Total Benefits` = Employee_Compensation$`Total Benefits`, `Total Compensation` = Employee_Compensation$`Total Compensation`)
+
+View(Employee_Earnings)
+
+Occupation <- tibble(Job = Employee_Compensation$Job, `Job Code` = Employee_Compensation$`Job Code`, `Job Family` = Employee_Compensation$`Job Family`, `Job Family Code` = Employee_Compensation$`Job Family Code`, `Union` = Employee_Compensation$`Union`, `Union Code` = Employee_Compensation$`Union Code`,  `Department Code` = Employee_Compensation$`Department Code`)
+
+View(Occupation)
+
+Occupation_Associations <- tibble(`Organization Group`= Employee_Compensation$`Organization Group`, `Organization Group Code` = Employee_Compensation$`Organization Group Code`,`Department` = Employee_Compensation$`Department`, `Department Code` = Employee_Compensation$`Department Code`, `Job Code` = Employee_Compensation$`Job Code`)
+
+View(Occupation_Associations)
+
+```
+
+
+### _**Part 4: Summarization**_
+
+In this data set, we are analyzing 102660 San Francisco City employees who work a wide variety of jobs. These jobs are sorted into 58 Job Families, which are from 56 Departments. Lastly, the broadest group that these city jobs are apart of are 7 different Organization groups. This heirachy of occupation can be thought of a tree or a pyramid, where the top is the Organization Group, and the lowest level will be individual Job, or the individual employees depending on how you look at it. The percent composition of the number of employees occupying of each Organization Groups is Community Health: 18%, Culture & Recreation: 8%, General Administration & Finance: 8%, General City Responsibilities: 17%, Human Welfare & Neighborhood Development: 9%, Public Protection: %15, Public Works, Transportation & Commerce: 25%. To get get a better sense of this arrangement, there is a graph down below that helps us see the amount of employees in each Organization Group. 
+
+```{r}
+#grouped each distinct Employee Identifier by Organization Group Code to compare the amount of employees there are in each Organization Group
+Total_OEmployee <- Employee_Compensation %>%  group_by(`Organization Group Code`) %>% summarize( `Organization Group` = first(`Organization Group`), `Number of Employees` = n_distinct(`Employee Identifier`, na.rm=T))
+
+Total_OEmployee
+
+Total_OEmployee_graph <- ggplot(Total_OEmployee, aes(x = `Organization Group`, y = `Number of Employees`)) + geom_col() + theme(axis.text.x = element_text(size=8, angle = 345, vjust = 1, hjust = 0, color = "black"), panel.background = element_rect(color = "black" , size = 1),  aspect.ratio = .75, plot.margin =  margin(t = 0, r = 2, b = 0, l = 0, unit = "in"))
+
+Total_OEmployee_graph
+```
+
+
+The data set also shows the earnings of each of Employee from the years 2019 to 2013. This includes their Total Salaries, Total Compensations, and Total Benefits. The average Total Salary that all employees are paid is \$50354 while the highest amount one is \$393158. For Total Benefits, the average is \$19738 and the max is \$108384, while Total Compensation has the average of \$70114  and the max of \$501542. In the graph below, we can look at the average  Total Salary each employee makes and observe that most city are making between \$0 to $100,000 a year.
+*NOTE: We did not include submissions that have a negative Total Salary.
+```{r}
+
+Total_Salary_Ave <- Employee_Compensation%>%  group_by(`Employee Identifier`, `Job Code`) %>% filter(`Total Salary` >= 0 & !is.nan(`Total Salary`)) %>% summarise(`Salary Mean` = mean(`Total Salary`, na.rm=T))
+
+Total_Salary_Ave
+
+Total_Salary_Ave_Graph <- ggplot(data = Total_Salary_Ave, aes(`Salary Mean`)) + geom_area(stat = "bin", binwidth = 100000, fill = "darkblue") +  scale_x_continuous(name = "The Mean of the Total Salary of a Employee", breaks= waiver(), labels = comma,limits = c(0,400000)) + scale_y_continuous(name="The Amount of People", breaks= waiver(), label = comma) + theme(axis.text.x = element_text(color = "black"), panel.background = element_rect(color = "black" , size = 1))
+
+Total_Salary_Ave_Graph
+
+```
+
+
+### _**Part 5: Research Questions**_
+
+Some research questions I hope to answer in the future:
+
+1. What is the best San Francisco city job to work for? 
+This questions sounds easy to answer but there are different factors of a job that comes in such as time and work one puts into it, as well as the level of difficulty and dangers of it.
+
+2. What main factors of a job will make people want to work for the city of San Francisco and how could we promote these city jobs? 
+What is difficult about answering this questions is that many different reasons why someone would work for the city, it may because they wanted desired to have a specific job, such as a police officer, or they wanted to stay in San Francisco to live and have a family.
+
+3. How can the city gain more money to finance their jobs, what actions could they take to give workers more benfits?
+This may be a more political questions as the government would be making the final decesions.
